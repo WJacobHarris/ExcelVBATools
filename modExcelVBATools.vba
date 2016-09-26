@@ -25,6 +25,8 @@ Option Explicit
 
 'Place in Module1 for whatever notebook (must be xlsm file)
 
+'Note some features require ADO 2.x
+
 Sub Button1_Click()
     Application.ScreenUpdating = False 'Suppress screen updates for speed
     Application.DisplayAlerts = False 'Disable prompts to ensure we're not harassing the user.
@@ -136,3 +138,47 @@ Public Sub InsertRowBelow(Worksheet As Worksheet, row As Integer)
     ActiveCell.Offset(1).EntireRow.PasteSpecial xlPasteValues
     Application.CutCopyMode = False
 End Sub
+
+Public Function GetSQLValue(SQLQuery As String, Optional showError As Boolean = False)
+    Dim retVal As Variant
+    Application.Volatile
+    On Error GoTo Err
+    
+    Dim cnn As New ADODB.Connection
+    Dim rs As New ADODB.Recordset
+    Dim cnnStr As String
+    
+    cnnStr = "Provider=Microsoft.ACE.OLEDB.12.0;Data Source='" & Application.ActiveWorkbook.Path & "\" & Application.ActiveWorkbook.Name & "';" & _
+             "Extended Properties=""Excel 12.0;ReadOnly=true;HDR=YES;IMEX=1;"";"
+    
+    cnn.Open cnnStr
+
+    rs.Open SQLQuery, cnn, adOpenStatic, adLockReadOnly, adCmdText
+    
+    If Not rs.EOF And Not rs.BOF Then
+        rs.MoveFirst
+        If rs.Fields.Count > 1 Then
+            retVal = CVErr(xlErrNA)
+        Else
+            retVal = rs.Fields(0).Value
+        End If
+    
+    End If
+    
+    Set cnn = Nothing
+    Set rs = Nothing
+
+    GetSQLValue = retVal
+    Exit Function
+Err:
+    
+    If showError Then
+        MsgBox Err.Number & " " & Err.Description & " " & Err.Source
+    End If
+    GetSQLValue = CVErr(xlErrNA)
+End Function
+
+
+
+
+
