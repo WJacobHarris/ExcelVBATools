@@ -25,7 +25,7 @@ Option Explicit
 
 'Place in Module1 for whatever notebook (must be xlsm file)
 
-'Note some features require ADO 2.x
+'Note some features require ADO 2.x and Microsoft Scripting Runtime
 
 Sub Button1_Click()
     Application.ScreenUpdating = False 'Suppress screen updates for speed
@@ -46,6 +46,7 @@ Public Sub RemoveSheet(worksheetName As String)
     
 End Sub
 
+'''Takes sourceWorksheet and creates a target worksheet by splitting a column
 Public Sub ParseData(sourceWorksheet As String, targetWorksheet As String, columnToSplit As String)
     On Error Resume Next
     Dim wksheetSource As Worksheet
@@ -65,10 +66,10 @@ Public Sub ParseData(sourceWorksheet As String, targetWorksheet As String, colum
     End If
     
     'Clear target worksheet
-    wksheetTarget.UsedRange.Cells.ClearContents
+    wksheetTarget.UsedRange.cells.ClearContents
     
     'Copy data from source to target so we can work
-    wksheetSource.UsedRange.Cells.Copy
+    wksheetSource.UsedRange.cells.Copy
     wksheetTarget.Range("A1").PasteSpecial xlPasteValues
     
     On Error GoTo Err
@@ -178,7 +179,97 @@ Err:
     GetSQLValue = CVErr(xlErrNA)
 End Function
 
+'''Requires Microsoft Scripting Runtime
+Public Function CountDistinctValues(cells As Range, Optional excludeHidden As Boolean = True, Optional showError As Boolean = False)
+    Dim retVal As Variant
+    Application.Volatile
+    On Error GoTo Err
+    Dim map As New Scripting.Dictionary
+    Dim selectedRange As Range
+    Dim cell As Range
+    
+    If excludeHidden Then
+        Set selectedRange = cells.SpecialCells(xlCellTypeVisible)
+    Else
+        Set selectedRange = cells
+    End If
+    
+    retVal = 0
+    
+    For Each cell In selectedRange
+        If (Not excludeHidden) Or (Not cell.EntireRow.Hidden) Then
+            If Not map.Exists(cell.Value) Then
+                map.Add cell.Value, 1
+            Else
+                map.Item(cell.Value) = map.Item(cell.Value) + 1
+            End If
+        End If
 
+    Next cell
+    
+    retVal = CLng(map.Count)
+    
+    Set map = Nothing
+    Set selectedRange = Nothing
+    Set cell = Nothing
+    
+    CountDistinctValues = retVal
+    Exit Function
+Err:
+    Set map = Nothing
+    Set selectedRange = Nothing
+    Set cell = Nothing
+    
+    If showError Then
+        MsgBox Err.Number & " " & Err.Description & " " & Err.Source
+    End If
+    CountDistinctValues = CVErr(xlErrNA)
+End Function
 
+'''Requires Microsoft Scripting Runtime
+Public Function CountFrequency(cells As Range, searchValue As Variant, Optional excludeHidden As Boolean = True, Optional showError As Boolean = False)
+    Dim retVal As Variant
+    Application.Volatile
+    On Error GoTo Err
+    Dim map As New Scripting.Dictionary
+    Dim selectedRange As Range
+    Dim cell As Range
+    
+    If excludeHidden Then
+        Set selectedRange = cells.SpecialCells(xlCellTypeVisible)
+    Else
+        Set selectedRange = cells
+    End If
+    
+    retVal = 0
+    
+    For Each cell In selectedRange
+        If (Not excludeHidden) Or (Not cell.EntireRow.Hidden) Then
+            If cell.Value = searchValue Then
+                retVal = retVal + 1
+            End If
+        End If
 
+    Next cell
+    
+    If map.Exists(searchValue) Then
+        retVal = CLng(map.Item(searchValue))
+    End If
+    
+    Set map = Nothing
+    Set selectedRange = Nothing
+    Set cell = Nothing
+    
+    CountFrequency = retVal
+    Exit Function
+Err:
+    Set map = Nothing
+    Set selectedRange = Nothing
+    Set cell = Nothing
+    
+    If showError Then
+        MsgBox Err.Number & " " & Err.Description & " " & Err.Source
+    End If
+    CountFrequency = CVErr(xlErrNA)
+End Function
 
