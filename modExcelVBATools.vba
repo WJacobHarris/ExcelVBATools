@@ -30,11 +30,40 @@ Option Explicit
 Sub Button1_Click()
     Application.ScreenUpdating = False 'Suppress screen updates for speed
     Application.DisplayAlerts = False 'Disable prompts to ensure we're not harassing the user.
+    Application.Calculation = xlCalculationManual
     Call ParseData("SourceData", "ParsedDataForColC", "C")
     Call ParseData("ParsedDataForColC", "ParsedDataFinal", "E") 'Final sheet
     'Call RemoveSheet("ParsedDataForColC") 'Optional removal of temporary sheet
     Application.DisplayAlerts = True 'Re-enable prompts
     Application.ScreenUpdating = True 'Disable suppression of screen updates
+    Application.Calculation = xlCalculationAutomatic
+    
+End Sub
+
+Sub TestInsertColumn()
+    Application.ScreenUpdating = False 'Suppress screen updates for speed
+    Application.DisplayAlerts = False 'Disable prompts to ensure we're not harassing the user.
+    Application.Calculation = xlCalculationManual
+    
+    
+    
+    Dim wksheetSource As Worksheet
+    Set wksheetSource = Worksheets("SampleColumnInsert")
+    
+    InsertCellsToLeft wksheetSource, "C", "Lattitude"
+    SetFormula wksheetSource, "C", "=SimpleLookup(SQLLookupSource!A:C, ""A"", A{R}, ""B"")" 'Adds formula to lookup lattitude
+    
+    InsertCellsToLeft wksheetSource, "D", "Longitude"
+    SetFormula wksheetSource, "D", "=SimpleLookup(SQLLookupSource!A:C, ""A"", A{R}, ""C"")" 'Adds formula to lookup longitude
+    
+    wksheetSource.Calculate
+    Set wksheetSource = Nothing
+    
+    
+    Application.DisplayAlerts = True 'Re-enable prompts
+    Application.ScreenUpdating = True 'Disable suppression of screen updates
+    Application.Calculation = xlCalculationAutomatic
+    
     
 End Sub
 
@@ -272,4 +301,94 @@ Err:
     End If
     CountFrequency = CVErr(xlErrNA)
 End Function
+
+'''Requires Microsoft Scripting Runtime
+Public Function SimpleLookup(sourceCells As Range, searchColumn As String, searchValue As Variant, returnColumn As String, Optional excludeHidden As Boolean = True, Optional showError As Boolean = False)
+    Dim retVal As Variant
+    Application.Volatile
+    On Error GoTo Err
+    Dim selectedRange As Range
+    Dim cell As Range
+    Dim row As Range
+    
+    If excludeHidden Then
+        Set selectedRange = sourceCells.SpecialCells(xlCellTypeVisible)
+    Else
+        Set selectedRange = sourceCells
+    End If
+    
+    retVal = 0
+    
+    For Each row In selectedRange.rows
+        If (Not excludeHidden) Or (Not row.EntireRow.Hidden) Then
+            'check if searchColumn is within range.
+            Set cell = row.columns(searchColumn)
+            If Not cell Is Nothing Then
+                If cell.Value = searchValue Then
+                    Set cell = row.columns(returnColumn)
+                    SimpleLookup = cell.Value
+                    Exit Function
+                End If
+            End If
+            
+            
+        End If
+
+    Next row
+    
+    Set selectedRange = Nothing
+    Set cell = Nothing
+    
+    SimpleLookup = Empty
+    Exit Function
+Err:
+    Set selectedRange = Nothing
+    Set cell = Nothing
+    
+    If showError Then
+        MsgBox Err.Number & " " & Err.Description & " " & Err.Source
+    End If
+    SimpleLookup = CVErr(xlErrNA)
+End Function
+
+
+'Inserts a blank column to the left of the column specified.
+Public Sub InsertCellsToLeft(Worksheet As Worksheet, column As String, Optional NewTitle As String = "")
+    Worksheet.Range(column & ":" & column).Select
+    ActiveCell.Offset(1).EntireColumn.Insert Shift:=xlRight, CopyOrigin:=xlFormatFromLeftOrAbove
+    ActiveCell.Offset(1).cells(0).Value = NewTitle
+
+    Application.CutCopyMode = False
+End Sub
+
+'Sets a formula for each cell.
+Public Sub SetFormula(Worksheet As Worksheet, column As String, formula As String)
+    Dim activeRange As Range
+    Dim cell As Range
+    Dim row As Range
+    Dim targetFormula As String
+    
+    
+    Set activeRange = Worksheet.UsedRange.Offset(1)
+    
+    For Each row In activeRange.rows
+        Set cell = row.columns(column)
+        'Sample formula, {R} is a row placeholder and {C} is a column placeholder
+        '=SimpleLookup(SQLLookupSource!A:C, "A", SimpleLookupExample!A{R}, "B")
+        targetFormula = Replace(formula, "{R}", row.row)
+        targetFormula = Replace(targetFormula, "{C}", row.row)
+        
+        cell.formula = targetFormula
+        
+        Set cell = Nothing
+    Next row
+    
+    
+    
+    Set activeRange = Nothing
+
+    Application.CutCopyMode = False
+End Sub
+
+
 
